@@ -33,7 +33,7 @@ class Game {
     public void start() {
         userInterface.printWelcomeMessage();
         while (attemptsLeft > 0 && !wordToGuess.equals(guessedWord.toString())) {
-            userInterface.printCurrentState(guessedWord.toString(), attemptsLeft);
+            userInterface.printCurrentState(guessedWord.toString(), attemptsLeft, maxAttempts);
             char guess = userInterface.readPlayerGuess();
             processGuess(guess);
         }
@@ -148,7 +148,7 @@ class UserInterface {
         System.out.println("Добро пожаловать в игру Виселица!");
     }
 
-    public void printCurrentState(String guessedWord, int attemptsLeft) {
+    public void printCurrentState(String guessedWord, int attemptsLeft, int maxAttempts) {
         System.out.println(hangmanStages[maxAttempts - attemptsLeft]);
         System.out.println("Текущее состояние слова: " + guessedWord);
         System.out.println("Осталось попыток: " + attemptsLeft);
