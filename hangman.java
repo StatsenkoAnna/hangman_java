@@ -14,6 +14,7 @@ public class HangmanGame {
     public static void main(String[] args) {
         Game game = new Game("words.txt");
         game.start();
+        game.getUi().getScanner().close(); // Закрываем сканнер после окончания игры
     }
 }
 
@@ -81,6 +82,10 @@ class Game {
 
     private boolean isWin() {
         return wordToGuess.equals(guessedWord.toString());
+    }
+
+    public Ui getUi() {
+        return ui;
     }
 
     private static final char MASK = '_';
@@ -227,5 +232,9 @@ class Ui {
 
     public void printLose(String wordToGuess) {
         System.out.println("Вы проиграли. Загаданное слово было: " + wordToGuess);
+    }
+
+    public Scanner getScanner() {
+        return scanner;
     }
 }
