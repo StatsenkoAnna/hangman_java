@@ -2,9 +2,12 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.Set;
 
 public class HangmanGame {
 
@@ -16,37 +19,51 @@ public class HangmanGame {
 
 class Game {
     private final WordSelector wordSelector;
-    private final UserInterface userInterface;
+    private final Ui ui;
     private final String wordToGuess;
     private final int maxAttempts = 6;
     private int attemptsLeft;
     private StringBuilder guessedWord;
+    private Set<Character> incorrectGuesses;
 
     public Game(String wordsFilePath) {
         this.wordSelector = new WordSelector(wordsFilePath);
-        this.userInterface = new UserInterface();
-        this.wordToGuess = wordSelector.getRandomWord();
+        this.ui = new Ui();
+        this.wordToGuess = wordSelector.getRandomWord().orElseThrow(() -> new RuntimeException("Файл с словами пуст."));
         this.attemptsLeft = maxAttempts;
-        this.guessedWord = new StringBuilder("_".repeat(wordToGuess.length()));
+        this.guessedWord = new StringBuilder(MASK.repeat(wordToGuess.length()));
+        this.incorrectGuesses = new HashSet<>();
     }
 
     public void start() {
-        userInterface.printWelcomeMessage();
-        while (attemptsLeft > 0 && !wordToGuess.equals(guessedWord.toString())) {
-            userInterface.printCurrentState(guessedWord.toString(), attemptsLeft, maxAttempts);
-            char guess = userInterface.readPlayerGuess();
+        ui.printWelcomeMessage();
+        while (isInGame()) {
+            ui.printCurrentState(guessedWord.toString(), attemptsLeft, maxAttempts, incorrectGuesses);
+            char guess = ui.readPlayerGuess();
             processGuess(guess);
         }
-        userInterface.printFinalResult(wordToGuess, guessedWord.toString());
+        if (isWin()) {
+            ui.printWin(wordToGuess);
+        } else {
+            ui.printLose(wordToGuess);
+        }
     }
 
     private void processGuess(char guess) {
+        guess = Character.toLowerCase(guess);
+        if (!Character.isLetter(guess)) {
+            ui.printInvalidGuessMessage();
+            return;
+        }
         if (wordToGuess.indexOf(guess) != -1) {
             updateGuessedWord(guess);
-            userInterface.printCorrectGuessMessage();
-        } else {
+            ui.printCorrectGuessMessage();
+        } else if (!incorrectGuesses.contains(guess)) {
+            incorrectGuesses.add(guess);
             attemptsLeft--;
-            userInterface.printIncorrectGuessMessage();
+            ui.printIncorrectGuessMessage();
+        } else {
+            ui.printAlreadyGuessedMessage();
         }
     }
 
@@ -57,6 +74,16 @@ class Game {
             }
         }
     }
+
+    private boolean isInGame() {
+        return attemptsLeft > 0 && !wordToGuess.equals(guessedWord.toString());
+    }
+
+    private boolean isWin() {
+        return wordToGuess.equals(guessedWord.toString());
+    }
+
+    private static final char MASK = '_';
 }
 
 class WordSelector {
@@ -66,13 +93,12 @@ class WordSelector {
         this.words = readWordsFromFile(filePath);
     }
 
-    public String getRandomWord() {
+    public Optional<String> getRandomWord() {
         if (words.isEmpty()) {
-            System.err.println("Файл с словами пуст.");
-            System.exit(1);
+            return Optional.empty();
         }
         Random random = new Random();
-        return words.get(random.nextInt(words.size()));
+        return Optional.of(words.get(random.nextInt(words.size())));
     }
 
     private List<String> readWordsFromFile(String filePath) {
@@ -84,84 +110,99 @@ class WordSelector {
             }
         } catch (IOException e) {
             System.err.println("Ошибка при чтении файла: " + e.getMessage());
-            System.exit(1);
         }
         return words;
     }
 }
 
-class UserInterface {
+class Ui {
     private final Scanner scanner = new Scanner(System.in);
     private final String[] hangmanStages = {
-        "  +---+\n" +
-        "  |   |\n" +
-        "      |\n" +
-        "      |\n" +
-        "      |\n" +
-        "      |\n" +
-        "=========",
-        "  +---+\n" +
-        "  |   |\n" +
-        "  O   |\n" +
-        "      |\n" +
-        "      |\n" +
-        "      |\n" +
-        "=========",
-        "  +---+\n" +
-        "  |   |\n" +
-        "  O   |\n" +
-        "  |   |\n" +
-        "      |\n" +
-        "      |\n" +
-        "=========",
-        "  +---+\n" +
-        "  |   |\n" +
-        "  O   |\n" +
-        " /|   |\n" +
-        "      |\n" +
-        "      |\n" +
-        "=========",
-        "  +---+\n" +
-        "  |   |\n" +
-        "  O   |\n" +
-        " /|\\  |\n" +
-        "      |\n" +
-        "      |\n" +
-        "=========",
-        "  +---+\n" +
-        "  |   |\n" +
-        "  O   |\n" +
-        " /|\\  |\n" +
-        " /    |\n" +
-        "      |\n" +
-        "=========",
-        "  +---+\n" +
-        "  |   |\n" +
-        "  O   |\n" +
-        " /|\\  |\n" +
-        " / \\  |\n" +
-        "      |\n" +
-        "========="
+        """
+            +---+
+            |   |
+                |
+                |
+                |
+                |
+            =======
+            """,
+        """
+            +---+
+            |   |
+            O   |
+                |
+                |
+                |
+            =======
+            """,
+        """
+            +---+
+            |   |
+            O   |
+            |   |
+                |
+                |
+            =======
+            """,
+        """
+            +---+
+            |   |
+            O   |
+           /|   |
+                |
+                |
+            =======
+            """,
+        """
+            +---+
+            |   |
+            O   |
+           /|\\  |
+                |
+                |
+            =======
+            """,
+        """
+            +---+
+            |   |
+            O   |
+           /|\\  |
+           /    |
+                |
+            =======
+            """,
+        """
+            +---+
+            |   |
+            O   |
+           /|\\  |
+           / \\  |
+                |
+            =======
+            """
     };
 
     public void printWelcomeMessage() {
         System.out.println("Добро пожаловать в игру Виселица!");
     }
 
-    public void printCurrentState(String guessedWord, int attemptsLeft, int maxAttempts) {
+    public void printCurrentState(String guessedWord, int attemptsLeft, int maxAttempts, Set<Character> incorrectGuesses) {
         System.out.println(hangmanStages[maxAttempts - attemptsLeft]);
         System.out.println("Текущее состояние слова: " + guessedWord);
         System.out.println("Осталось попыток: " + attemptsLeft);
+        System.out.println("Неправильные буквы: " + incorrectGuesses);
     }
 
     public char readPlayerGuess() {
-        System.out.print("Введите букву: ");
-        String input = scanner.nextLine();
-        if (input.length() != 1) {
+        while (true) {
+            System.out.print("Введите букву: ");
+            String input = scanner.nextLine();
+            if (input.length() == 1) {
+                return input.charAt(0);
+            }
             System.out.println("Пожалуйста, введите только одну букву.");
-            return readPlayerGuess();
         }
-        return input.charAt(0);
     }
 
     public void printCorrectGuessMessage() {
@@ -172,12 +213,19 @@ class UserInterface {
         System.out.println("Неправильная буква!");
     }
 
-    public void printFinalResult(String wordToGuess, String guessedWord) {
-        if (wordToGuess.equals(guessedWord)) {
-            System.out.println("Поздравляем! Вы угадали слово: " + wordToGuess);
-        } else {
-            System.out.println("Вы проиграли. Загаданное слово было: " + wordToGuess);
-        }
-        scanner.close();
+    public void printInvalidGuessMessage() {
+        System.out.println("Пожалуйста, введите букву русского алфавита.");
+    }
+
+    public void printAlreadyGuessedMessage() {
+        System.out.println("Вы уже вводили эту букву.");
+    }
+
+    public void printWin(String wordToGuess) {
+        System.out.println("Поздравляем! Вы угадали слово: " + wordToGuess);
+    }
+
+    public void printLose(String wordToGuess) {
+        System.out.println("Вы проиграли. Загаданное слово было: " + wordToGuess);
     }
 }
